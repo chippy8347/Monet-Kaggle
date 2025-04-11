@@ -38,8 +38,8 @@ from tqdm import tqdm
 """### Create Dataset Class"""
 
 # Define paths
-photo_jpg_path = "/work/classes/csc4260-001-2025s/tqduong42/kaggle/photo_jpg"
-monet_jpg_path = "/work/classes/csc4260-001-2025s/tqduong42/kaggle/monet_jpg"
+photo_jpg_path = "/work/classes/csc4260-001-2025s/kcadams42/photo_jpg"
+monet_jpg_path = "/work/classes/csc4260-001-2025s/kcadams42/monet_jpg"
 
 
 
@@ -77,8 +77,8 @@ monet_jpg_dataset = CustomImageDataset(root_dir=monet_jpg_path, transform=transf
 # Create dataloaders
 # batch_size is how ever many we want to process per iteration
 # shuffle = true to prevent overfitting
-photo_jpg_loader = DataLoader(photo_jpg_dataset, batch_size=32, shuffle=True, num_workers=2, prefetch_factor=2, pin_memory=True)
-monet_jpg_loader = DataLoader(monet_jpg_dataset, batch_size=16, shuffle=True, num_workers=2, prefetch_factor=2, pin_memory=True)
+photo_jpg_loader = DataLoader(photo_jpg_dataset, batch_size=32, shuffle=True, num_workers=0, prefetch_factor=None, pin_memory=False)
+monet_jpg_loader = DataLoader(monet_jpg_dataset, batch_size=16, shuffle=True, num_workers=0, prefetch_factor=None, pin_memory=False)
 
 # Function to convert tensor to image for visualization
 # def tensor_to_image(tensor):
@@ -255,8 +255,12 @@ class Discriminator(nn.Module):
 
 """# Training Loop"""
 
-print(torch.cuda.is_available())  # True if a GPU is available
-print(torch.cuda.get_device_name(0))  # Show the GPU model
+print("CUDA Available:", torch.cuda.is_available())
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if device.type == "cuda":
+    print("Using GPU:", torch.cuda.get_device_name(0))
+else:
+    print("⚠️ CUDA not available. Running on CPU (slower).")
 
 """TPU Setup"""
 
@@ -336,16 +340,9 @@ print(torch.cuda.get_device_name(0))  # Show the GPU model
 # Training Loop for GPU
 # Made by Daniel Byerly, Tyler Duong, modified by Gavin McDuffee
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-generator = Generator()
-discriminator = Discriminator()
-
-# generator = torch.nn.DataParallel(generator)
-# discriminator = torch.nn.DataParallel(discriminator)
-
-generator.to(device)
-discriminator.to(device)
+generator = Generator().to(device)
+discriminator = Discriminator().to(device)
 
 # Optimizers (FOR GPU ONLY)
 g_optimizer = optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
@@ -379,7 +376,7 @@ monet_cycle = cycle(monet_jpg_loader)
 epochs = 10
 for epoch in range(epochs):
     # Pair real photos with Monet paintings for balanced training
-
+    print(f"🔄 Epoch {epoch + 1} started...")
 
     # for real_photos, real_monets in zip(photo_jpg_loader, monet_jpg_loader):
     #     real_photos, real_monets = real_photos.to(device), real_monets.to(device)
@@ -446,7 +443,7 @@ for epoch in range(epochs):
 
 # Define paths
 photo_folder = photo_jpg_path  # Folder containing real photos
-output_folder = "/work/classes/csc4260-001-2025s/tqduong42/kaggle/output"  # Folder to save Monet-style images
+output_folder = "/work/classes/csc4260-001-2025s/kcadams42/kaggle/output"  # Folder to save Monet-style images
 os.makedirs(output_folder, exist_ok=True)
 
 # Load trained generator (ensure it's in eval mode)
@@ -473,7 +470,7 @@ for image_name in tqdm(os.listdir(photo_folder)):
     output_path = os.path.join(output_folder, image_name)
 
     with torch.no_grad():
-        input_image = preprocess_image(image_path).to('cuda' if torch.cuda.is_available() else 'cpu')
+        input_image = preprocess_image(image_path).to(device)
         generated_monet = generator(input_image)
         save_image(generated_monet, output_path)
 
